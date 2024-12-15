@@ -1,3 +1,6 @@
+import os
+import sys
+
 import numpy as np 
 import pandas as pd 
 from dataclasses import dataclass
@@ -6,10 +9,9 @@ from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from src.exception import CustomException
 from src.logger import logging
-from data_ingestion import DataIngestion
 from sklearn.pipeline import Pipeline
-import os
-import sys
+from src.utils import save_object
+
 
 
 @dataclass
@@ -41,7 +43,7 @@ class DataTransformation:
             steps=[
                 ('missing_values_handler',SimpleImputer(strategy='most_frequent')),
                 ('categorical_encoder',OneHotEncoder()),
-                ('normalizer',StandardScaler())
+                ('normalizer',StandardScaler(with_mean=False))
             ]
              )
             logging.info("num and catcolums stardation completed .")
@@ -63,12 +65,39 @@ class DataTransformation:
             logging.info('Reading train and test data completed.')
 
             preprocessing_obj = self.get_data_transformer_object()
+
             target_colum = 'math_score'
             num_features = ['reading_score', 'writing_score']
-            input_data_train_df =train_df.drop(columns=[target_colum],axis=1)
 
+            input_feature_train_df =train_df.drop(columns=[target_colum],axis=1)
+            target_feature_train_df = train_df[target_colum]
+
+            input_feature_test_df =test_df.drop(columns=[target_colum],axis=1)
+            target_feature_test_df = test_df[target_colum]
+
+            logging.info("Apply preprocessing to train and test df.")
+
+            input_feature_train_df = preprocessing_obj.fit_transform(input_feature_train_df)
+            input_feature_test_df = preprocessing_obj.fit_transform(input_feature_test_df)
+
+            train_arr = np.c_[input_feature_train_df,np.array(target_feature_train_df)]
+            test_arr = np.c_[input_feature_test_df,np.array(target_feature_test_df)]
+
+            logging.info('Saved preprocessing obj.')
+
+            save_object(
+                file_path =  self.data_transformation_config.preprocesser_obj_file_path ,
+                obj = preprocessing_obj
+            )
+
+            return(
+                train_arr,
+                test_arr,
+                self.data_transformation_config.preprocesser_obj_file_path
+            )
         except Exception as e :
-            pass
+            raise CustomException(e,sys)
+            
 
 
 
